@@ -1,0 +1,29 @@
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Environment / secrets ----
+.env
+.env.*
+*.local
+
+# ---- Node / Next.js (frontend, later) ----
+node_modules/
+.next/
+dist/
+build/
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- Project ----
+doc_extracted.txt
