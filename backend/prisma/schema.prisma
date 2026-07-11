@@ -1,0 +1,64 @@
+// Prisma schema — AnalyticsOS
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  runtime      = "nodejs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// A customer organization. The root of tenant isolation — every row that
+/// belongs to a customer carries a `tenantId` foreign key back to here.
+model Tenant {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  plan      String   @default("starter")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  connections Connection[]
+}
+
+/// A person inside a tenant. `authId` is the external identity-provider id
+/// (Clerk user id later; today it's whatever the stub auth guard hands us).
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  email     String
+  name      String?
+  role      String   @default("member")
+  authId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+/// A configured data-source connection for a tenant (e.g. a GA4 property).
+/// Credentials live in `config` (encrypted at rest later); status tracks sync.
+model Connection {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  source      String // 'ga4', 'meta_ads', 'nginx_logs', ...
+  displayName String
+  status      String    @default("pending") // pending | active | error
+  config      Json      @default("{}")
+  lastSyncAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, source])
+}

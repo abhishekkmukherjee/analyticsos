@@ -203,13 +203,13 @@ Node (NestJS) app  ──HTTP──▶  ml-service (Python + FastAPI)
 ## 8. Revised Phase 1 Checklist
 
 1. ✅ Choose stack: TypeScript + NestJS
-2. ⬜ Scaffold the NestJS backend project
-3. ⬜ First endpoint running (`GET /` → health check)
-4. ⬜ Environment config (`@nestjs/config` + `.env`)
-5. ⬜ Prisma + PostgreSQL: `tenants` and `users` tables (multi-tenant schema)
-6. ⬜ Tenant-isolation middleware
-7. ⬜ Clerk auth integration
-8. ⬜ First connector: GA4 (following the BaseConnector pattern)
-9. ⬜ Basic chat endpoint calling Claude via `@anthropic-ai/sdk`
+2. ✅ Scaffold the NestJS backend project
+3. ✅ First endpoint running (`GET /api/v1` → health check, now DB-aware)
+4. ✅ Environment config (`@nestjs/config` + `.env`)
+5. ✅ Prisma + PostgreSQL: `Tenant`, `User`, `Connection` tables (multi-tenant schema, migrated to Neon)
+6. ✅ Tenant-isolation: `AuthGuard` populates `AuthContext.tenantId`; queries scope by it
+7. 🟡 Auth — **stub** header/dev-fallback guard in place (`AuthGuard`); swap for Clerk later at the same seam
+8. ✅ First connector: GA4 (`BaseConnector` pattern, mock now → live when GA4 creds set)
+9. ✅ Basic chat endpoint calling Claude via `@anthropic-ai/sdk` (mock now → live when `ANTHROPIC_API_KEY` set)
 
 *Success criterion (from original guide): a user can ask questions about GA4 data in chat.*
