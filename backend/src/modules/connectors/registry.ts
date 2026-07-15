@@ -1,23 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { BaseConnector } from './base-connector';
-import { Ga4Connector } from './analytics/ga4.connector';
+
+/** DI token for the list of all connector instances. */
+export const CONNECTORS = Symbol('CONNECTORS');
 
 /**
  * Central lookup of every available source connector, keyed by sourceName.
- * New connectors register themselves here (inject + add to the constructor
- * list). Everything else (metrics, chat, workers) resolves connectors through
- * this registry rather than newing them up.
+ * Connectors are collected via the CONNECTORS token (assembled in
+ * ConnectorsModule) so adding a source is a one-line change there.
  */
 @Injectable()
 export class ConnectorRegistry {
   private readonly connectors = new Map<string, BaseConnector>();
 
-  constructor(ga4: Ga4Connector) {
-    this.register(ga4);
-  }
-
-  private register(connector: BaseConnector): void {
-    this.connectors.set(connector.sourceName, connector);
+  constructor(@Inject(CONNECTORS) connectors: BaseConnector[]) {
+    for (const connector of connectors) {
+      this.connectors.set(connector.sourceName, connector);
+    }
   }
 
   get(source: string): BaseConnector | undefined {

@@ -213,3 +213,20 @@ Node (NestJS) app  ──HTTP──▶  ml-service (Python + FastAPI)
 9. ✅ Basic chat endpoint calling Claude via `@anthropic-ai/sdk` (mock now → live when `ANTHROPIC_API_KEY` set)
 
 *Success criterion (from original guide): a user can ask questions about GA4 data in chat.*
+
+---
+
+## 9. Phase 2 Checklist — Core Sources (Weeks 5–10)
+
+*Success criterion (from original guide): 10 data sources connected; metrics queryable.*
+
+1. ✅ Metrics store abstraction (`MetricsStore` interface + `METRICS_STORE` token)
+2. ✅ Postgres-backed `Metric` table + `PostgresMetricsStore` (migrated to Neon)
+   — ClickHouse-ready: swap the provider in `MetricsModule` when `CLICKHOUSE_URL` is set; nothing upstream changes
+3. ✅ 10 source connectors registered — `ga4`, `gsc`, `google_ads`, `meta_ads`, `linkedin_ads`, `tiktok_ads`, `stripe`, `shopify`, `hubspot`, `mailchimp` (mock now → live per-source when that source's env vars are set)
+4. ✅ `ScaffoldConnector` base + shared deterministic mock generator (`mock-metrics.ts`)
+5. ✅ Connections API: `GET/POST/DELETE /connections`, `POST /:id/sync`, `GET /:id/status` (tenant-scoped, persists to `Connection`)
+6. ✅ Sync pipeline: connector → `collect()` → `MetricsStore.insertMany()` → `Connection` status/`lastSyncAt`
+7. ✅ Metrics query API: `GET /metrics/query`, `GET /metrics/compare` (period-over-period `changePct`)
+8. ⬜ Dashboard charts (frontend — deferred until the Next.js app lands)
+9. ⬜ Live implementations for priority sources (fill the `TODO(live)` in each connector as creds arrive)

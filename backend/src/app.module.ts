@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { AuthGuard } from './common/auth/auth.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConnectorsModule } from './modules/connectors/connectors.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
+import { ConnectionsModule } from './modules/connections/connections.module';
 import { ChatModule } from './modules/chat/chat.module';
 
 @Module({
@@ -13,6 +15,8 @@ import { ChatModule } from './modules/chat/chat.module';
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     ConnectorsModule,
+    MetricsModule,
+    ConnectionsModule,
     ChatModule,
   ],
   controllers: [AppController],

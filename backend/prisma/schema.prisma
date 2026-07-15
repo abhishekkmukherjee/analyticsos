@@ -62,3 +62,20 @@ model Connection {
   @@index([tenantId])
   @@index([tenantId, source])
 }
+
+/// Time-series metric point. This is the Postgres implementation of the guide's
+/// ClickHouse `metrics` table — the MetricsStore interface lets a ClickHouse
+/// backend replace it later without touching connectors or the query API.
+/// No FK to Tenant on purpose: mirrors the columnar design and keeps writes cheap.
+model Metric {
+  id         Int      @id @default(autoincrement())
+  tenantId   String   @db.Uuid
+  source     String // 'ga4', 'stripe', 'meta_ads', ...
+  metricName String // 'sessions', 'revenue', 'error_5xx', ...
+  dimensions Json     @default("{}")
+  value      Float
+  recordedAt DateTime
+  ingestedAt DateTime @default(now())
+
+  @@index([tenantId, source, metricName, recordedAt])
+}
