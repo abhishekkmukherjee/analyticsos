@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(grep -E \"\\(^|/\\)\\\\.env$\")"
+      "Bash(grep -E \"\\(^|/\\)\\\\.env$\")",
+      "Bash(git status *)",
+      "Bash(npx --yes create-next-app@latest frontend --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --use-npm --eslint --turbopack --skip-install --yes)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\('next:',p.dependencies.next,'react:',p.dependencies.react,'recharts:',p.dependencies.recharts\\)\")",
+      "Bash(npx tsc *)",
+      "Bash(echo \"--- exit: $? ---\")",
+      "Bash(npx playwright *)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)"
     ]
   }
 }

@@ -13,8 +13,8 @@ export class AppService {
     const database = await this.checkDatabase();
     return {
       status: database === 'up' ? 'ok' : 'degraded',
-      service: this.configService.get('APP_NAME'),
-      version: this.configService.get('APP_VERSION'),
+      service: this.configService.get<string>('APP_NAME'),
+      version: this.configService.get<string>('APP_VERSION'),
       dependencies: { database },
     };
   }

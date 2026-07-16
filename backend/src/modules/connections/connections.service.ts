@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { Prisma } from '../../generated/prisma/client';
 import { ConnectorRegistry } from '../connectors/registry';
 import {
   METRICS_STORE,
@@ -12,7 +13,12 @@ import {
 } from '../metrics/metrics-store.interface';
 import type { CreateConnectionDto } from './dto/create-connection.dto';
 
-const SYNC_WINDOW_DAYS = 30;
+/**
+ * How much history a sync pulls. Deliberately wider than the dashboard's
+ * longest view (90d) so period-over-period comparisons always have a fully
+ * populated previous window to compare against.
+ */
+const SYNC_WINDOW_DAYS = 180;
 
 @Injectable()
 export class ConnectionsService {
@@ -40,7 +46,9 @@ export class ConnectionsService {
         tenantId,
         source: dto.source,
         displayName: dto.displayName ?? dto.source,
-        config: (dto.config ?? {}) as object,
+        // Cast is required: Prisma models JSON columns as InputJsonValue, which
+        // a plain Record<string, unknown> doesn't structurally satisfy.
+        config: (dto.config ?? {}) as Prisma.InputJsonValue,
       },
     });
   }
@@ -69,11 +77,19 @@ export class ConnectionsService {
       throw new BadRequestException(`Unknown connector source: ${conn.source}`);
     }
 
-    const end = new Date();
-    const start = new Date(end.getTime() - SYNC_WINDOW_DAYS * 86_400_000);
+    // Snap to whole UTC days so every sync on a given day uses byte-identical
+    // bounds. Without this, `now` drifts between runs and the delete range
+    // misses the previous run's boundary row, leaving stale rows behind.
+    const end = startOfUtcDay(new Date());
+    const start = startOfUtcDay(
+      new Date(end.getTime() - SYNC_WINDOW_DAYS * 86_400_000),
+    );
 
     try {
       const metrics = await connector.collect(tenantId, start, end);
+      // Replace the window rather than append — a repeated sync must not
+      // double-count. Same reason a retried job is safe.
+      await this.metrics.deleteRange(tenantId, conn.source, start, end);
       const written = await this.metrics.insertMany(tenantId, metrics);
       const updated = await this.prisma.connection.update({
         where: { id },
@@ -107,4 +123,11 @@ export class ConnectionsService {
     }
     return conn;
   }
+}
+
+/** Midnight UTC on the same calendar day as `date`. */
+function startOfUtcDay(date: Date): Date {
+  return new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()),
+  );
 }

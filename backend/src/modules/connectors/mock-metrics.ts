@@ -15,8 +15,11 @@ export async function* mockMetricStream(
   end: Date,
 ): AsyncGenerator<ConnectorMetric> {
   for (let day = new Date(start); day <= end; day = addDays(day, 1)) {
-    const wave = seededWave(day);
     for (const [metricName, baseline] of Object.entries(baselines)) {
+      // Phase the wave per metric — otherwise every metric on a source moves in
+      // lockstep and each stat tile reports an identical delta, which reads as
+      // broken rather than as data.
+      const wave = seededWave(day, `${source}:${metricName}`);
       yield {
         metricName,
         value: round(baseline * wave, baseline < 100),
@@ -43,10 +46,23 @@ function round(value: number, keepDecimals: boolean): number {
   return keepDecimals ? Math.round(value * 100) / 100 : Math.round(value);
 }
 
-/** Smooth deterministic 0.7–1.3 multiplier derived from the calendar day. */
-function seededWave(date: Date): number {
-  const seed = date.getUTCFullYear() * 366 + dayOfYear(date);
+/**
+ * Smooth deterministic 0.7–1.3 multiplier from the calendar day, offset by a
+ * per-series hash so different metrics rise and fall independently.
+ */
+function seededWave(date: Date, seriesKey: string): number {
+  const seed =
+    date.getUTCFullYear() * 366 + dayOfYear(date) + hashString(seriesKey);
   return 0.7 + Math.abs(Math.sin(seed)) * 0.6;
+}
+
+/** Small stable integer hash — decorrelates series without randomness. */
+function hashString(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) % 100_000;
+  }
+  return hash;
 }
 
 function dayOfYear(date: Date): number {

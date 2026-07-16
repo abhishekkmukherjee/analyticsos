@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConnectorsController } from './connectors.controller';
+import { BaseConnector } from './base-connector';
 import { ConnectorRegistry, CONNECTORS } from './registry';
 import { Ga4Connector } from './analytics/ga4.connector';
 import { GscConnector } from './analytics/gsc.connector';
@@ -32,7 +33,7 @@ const CONNECTOR_CLASSES = [
     ...CONNECTOR_CLASSES,
     {
       provide: CONNECTORS,
-      useFactory: (...connectors) => connectors,
+      useFactory: (...connectors: BaseConnector[]) => connectors,
       inject: CONNECTOR_CLASSES,
     },
     ConnectorRegistry,

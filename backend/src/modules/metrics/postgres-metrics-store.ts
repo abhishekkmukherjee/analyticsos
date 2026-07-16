@@ -29,6 +29,22 @@ export class PostgresMetricsStore implements MetricsStore {
     return result.count;
   }
 
+  async deleteRange(
+    tenantId: string,
+    source: string,
+    start: Date,
+    end: Date,
+  ): Promise<number> {
+    const result = await this.prisma.metric.deleteMany({
+      where: {
+        tenantId,
+        source,
+        recordedAt: { gte: start, lte: end },
+      },
+    });
+    return result.count;
+  }
+
   async query(q: MetricQuery): Promise<ConnectorMetric[]> {
     const rows = await this.prisma.metric.findMany({
       where: {

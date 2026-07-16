@@ -21,9 +21,7 @@ export abstract class BaseConnector {
   abstract readonly sourceName: string;
   readonly supportsRealtime: boolean = false;
 
-  abstract authenticate(
-    credentials: Record<string, unknown>,
-  ): Promise<boolean>;
+  abstract authenticate(credentials: Record<string, unknown>): Promise<boolean>;
 
   abstract fetchMetrics(
     tenantId: string,

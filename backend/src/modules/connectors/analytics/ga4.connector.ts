@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { BaseConnector, ConnectorMetric } from '../base-connector';
+import { mockMetricStream, type MetricBaselines } from '../mock-metrics';
 
 /**
  * Google Analytics 4 connector.
@@ -11,11 +12,21 @@ import { BaseConnector, ConnectorMetric } from '../base-connector';
  *            (chat, metrics endpoints) is demoable with zero external setup.
  *
  * Flip from mock to live by adding the two env vars — no code change needed.
+ *
+ * Unlike the scaffolded sources this keeps its own class (rather than extending
+ * ScaffoldConnector) because its live path is bespoke — it's the first source
+ * slated for a real API implementation.
  */
 @Injectable()
 export class Ga4Connector extends BaseConnector {
   readonly sourceName = 'ga4';
   private readonly logger = new Logger(Ga4Connector.name);
+
+  private readonly baselines: MetricBaselines = {
+    sessions: 1200,
+    activeUsers: 900,
+    screenPageViews: 3400,
+  };
 
   private get isLive(): boolean {
     return Boolean(
@@ -41,7 +52,7 @@ export class Ga4Connector extends BaseConnector {
       yield* this.fetchLive(tenantId, start, end);
       return;
     }
-    yield* this.fetchMock(start, end);
+    yield* mockMetricStream(this.sourceName, this.baselines, start, end);
   }
 
   async healthCheck(): Promise<Record<string, unknown>> {
@@ -52,67 +63,15 @@ export class Ga4Connector extends BaseConnector {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+  // eslint-disable-next-line require-yield -- throws until the live API lands
   private async *fetchLive(
     _tenantId: string,
     _start: Date,
     _end: Date,
   ): AsyncGenerator<ConnectorMetric> {
     // TODO(live): call GA4 Data API runReport and yield each row as a metric.
-    throw new Error('GA4 live mode not yet implemented — add the Data API call.');
+    throw new Error(
+      'GA4 live mode not yet implemented — add the Data API call.',
+    );
   }
-
-  /** Deterministic pseudo-random daily traffic (no external calls). */
-  // eslint-disable-next-line @typescript-eslint/require-await
-  private async *fetchMock(
-    start: Date,
-    end: Date,
-  ): AsyncGenerator<ConnectorMetric> {
-    const metrics = ['sessions', 'activeUsers', 'screenPageViews'] as const;
-    const baselines: Record<(typeof metrics)[number], number> = {
-      sessions: 1200,
-      activeUsers: 900,
-      screenPageViews: 3400,
-    };
-
-    for (
-      let day = new Date(start);
-      day <= end;
-      day = addDays(day, 1)
-    ) {
-      const wave = seededWave(day);
-      for (const metricName of metrics) {
-        yield {
-          metricName,
-          value: Math.round(baselines[metricName] * wave),
-          dimensions: { date: isoDate(day) },
-          recordedAt: new Date(day),
-          source: this.sourceName,
-        };
-      }
-    }
-  }
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-/** Smooth deterministic 0.7–1.3 multiplier from the calendar day. */
-function seededWave(date: Date): number {
-  const seed = date.getUTCFullYear() * 366 + dayOfYear(date);
-  const noise = Math.abs(Math.sin(seed)) * 0.6; // 0..0.6
-  return 0.7 + noise;
-}
-
-function dayOfYear(date: Date): number {
-  const startOfYear = Date.UTC(date.getUTCFullYear(), 0, 0);
-  const diff = date.getTime() - startOfYear;
-  return Math.floor(diff / 86_400_000);
 }

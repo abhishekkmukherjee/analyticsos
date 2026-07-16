@@ -6,7 +6,13 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    // Build output and the Prisma-generated client are not ours to lint.
+    ignores: [
+      'eslint.config.mjs',
+      'dist/**',
+      'src/generated/**',
+      'prisma.config.ts',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -29,7 +35,15 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
-      "prettier/prettier": ["error", { endOfLine: "auto" }],
+      // Connectors implement Promise-returning abstract signatures, so many
+      // methods are async by contract without awaiting anything internally.
+      '@typescript-eslint/require-await': 'off',
+      // `_name` marks an argument that's intentionally unused (interface shape).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
     },
   },
 );

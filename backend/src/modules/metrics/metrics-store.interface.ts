@@ -21,6 +21,18 @@ export interface MetricsStore {
   /** Persist a batch of metrics for a tenant. Returns rows written. */
   insertMany(tenantId: string, metrics: ConnectorMetric[]): Promise<number>;
 
+  /**
+   * Drop a source's metrics in a time range for one tenant. Sync calls this
+   * before re-inserting so a repeated sync replaces rather than double-counts
+   * (sync must be idempotent — safe to retry). Returns rows removed.
+   */
+  deleteRange(
+    tenantId: string,
+    source: string,
+    start: Date,
+    end: Date,
+  ): Promise<number>;
+
   /** Read back metrics in a time range, optionally filtered by source/name. */
   query(query: MetricQuery): Promise<ConnectorMetric[]>;
 }
