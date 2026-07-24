@@ -79,3 +79,45 @@ model Metric {
 
   @@index([tenantId, source, metricName, recordedAt])
 }
+
+/// A single log line/event from an infra source (nginx, docker, aws, ...).
+/// Rows arrive two ways: a log connector's sync (mock or provider API pull)
+/// and the Vector.dev push endpoint (POST /logs/ingest). Like Metric, no FK
+/// to Tenant — this table is high-volume and ClickHouse-bound later.
+model LogEvent {
+  id         Int      @id @default(autoincrement())
+  tenantId   String   @db.Uuid
+  source     String // 'nginx_logs', 'docker_logs', 'aws_logs', ...
+  level      String // 'debug' | 'info' | 'warn' | 'error'
+  message    String
+  host       String?
+  service    String?
+  metadata   Json     @default("{}")
+  timestamp  DateTime
+  ingestedAt DateTime @default(now())
+
+  @@index([tenantId, source, timestamp])
+  @@index([tenantId, level, timestamp])
+}
+
+/// A detected metric anomaly (Phase 3: log error spikes; Phase 4 widens this
+/// to every metric). One row per (source, metric, window) finding — detection
+/// re-runs replace the window's open rows so re-detection never duplicates.
+model Anomaly {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  source      String
+  metricName  String
+  severity    String // 'warning' | 'critical'
+  zscore      Float
+  observed    Float
+  expected    Float
+  windowStart DateTime
+  windowEnd   DateTime
+  status      String   @default("open") // open | acknowledged | resolved
+  context     Json     @default("{}")
+  detectedAt  DateTime @default(now())
+
+  @@index([tenantId, detectedAt])
+  @@index([tenantId, status])
+}

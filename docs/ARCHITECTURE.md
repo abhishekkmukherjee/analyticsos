@@ -207,6 +207,36 @@ Step 4 is what makes sync **idempotent** — run it 5 times, you get the same da
 not 5 copies. The window snaps to whole UTC days so repeated runs use identical
 bounds.
 
+### Logs (`src/modules/logs/` + `src/modules/connectors/logs/`) — Phase 3
+Log sources (nginx, docker, aws, vultr, hostinger) are different from metric
+sources: they produce **events** (individual log lines), not daily numbers. So:
+
+- `LogConnector` (extends `ScaffoldConnector`) streams `ConnectorLogEvent`s and
+  *derives* its daily metrics (`log_events`, `errors`, `warnings`) from that same
+  event stream — the numbers on the dashboard always match the stored events.
+- Mock mode generates deterministic events, including scheduled **error-spike
+  days** (~1 day in 11), so anomaly detection has real spikes to find in demos.
+- The real-world path is push, not pull: a **Vector.dev agent** on the customer's
+  server POSTs batches to `POST /logs/ingest`. The body is deliberately untyped —
+  shippers send messy shapes; we normalize levels (syslog `crit`→`error` etc.)
+  and keep unrecognized fields in `metadata` instead of dropping logs.
+- `GET /logs` (filter by source/level/text/time) and `GET /logs/summary`
+  (counts by source × level) read them back.
+
+### Anomalies (`src/modules/anomalies/`) — error-spike alerts
+`anomaly-detector.ts` is pure math (no I/O): each of the last 3 days is judged
+against the mean/σ of the days before them — a day beyond **2.5σ** is an anomaly,
+beyond **4σ** is critical. Named constants, unit-tested.
+
+`anomalies.service.ts` builds daily error counts **from the LogEvent table**
+(not from synced metrics — so logs pushed by real Vector agents trigger alerts
+exactly like mock syncs do), persists findings to the `Anomaly` table, and emits
+the Phase-3 alert (a structured server log; notification channels are Phase 4).
+Detection runs automatically after every log sync and on demand via
+`POST /anomalies/detect`. The feed is `GET /anomalies`; acknowledge/resolve via
+`PATCH /anomalies/:id` — an acknowledged anomaly is never resurrected by
+re-detection.
+
 ### Chat (`src/modules/chat/`)
 `chat.service.ts` — pulls the tenant's recent metrics, summarizes them into text,
 sends that to Claude as grounding context with the question, returns the answer.
@@ -270,17 +300,28 @@ fake numbers as real is the worst possible bug in an analytics product.
 - Metrics API (`query`, `compare`)
 - **Dashboard**: KPI tiles, line chart, table view, connections panel, chat
 
+**Phase 3 — Logs & Infra**
+- `LogEvent` + `Anomaly` tables
+- 5 log connectors: aws_logs, vultr_logs, hostinger_logs, nginx_logs, docker_logs
+- Logs API: `POST /logs/ingest` (Vector.dev push), `GET /logs`, `GET /logs/summary`
+- Z-score anomaly detection + `GET /anomalies` feed + acknowledge/resolve
+- Unit tests for the detector math and mock-log determinism
+
 **Everything is verified end-to-end** against the real Neon database: create a
-connection → sync (724 metrics) → query → compare → see it on a chart.
+connection → sync (543 metrics, 27k log events) → push an error burst through
+the ingest endpoint → detection flags a critical anomaly (z=26.8) → alert logged
+→ acknowledge survives re-detection. Sync remains idempotent for events too.
 
 ## 8. What's NOT built (be honest about this)
 
-- **All 10 sources are mock.** Not one talks to a real API yet.
+- **All 15 sources are mock.** Not one talks to a real API yet (though the log
+  ingest endpoint accepts real Vector.dev pushes today).
 - **Auth is a stub.** No real login. Dev mode auto-creates a demo tenant.
 - **No background jobs.** Sync only runs when you click the button. Real systems
   sync on a schedule (BullMQ + Redis, planned).
 - **No ClickHouse, Kafka, or Redis yet.**
-- **Barely any tests.** One health-check test.
+- **Thin test coverage.** Unit tests exist for anomaly math and mock logs;
+  nothing else.
 - **The frontend duplicates the compare math** the backend already does in
   `/metrics/compare` — the tiles compute deltas client-side instead. Known cleanup.
 
@@ -290,8 +331,8 @@ connection → sync (724 metrics) → query → compare → see it on a chart.
 |---|---|---|
 | 1 | Foundation: auth, DB, first connector, chat | ✅ Done |
 | 2 | Core sources: 10 connectors, metrics pipeline, dashboard | ✅ Done |
-| 3 | **Logs & Infra**: Nginx/AWS/Docker log connectors, log anomaly detection | ⬜ Next |
-| 4 | **Intelligence**: anomaly detection, forecasting (Prophet/XGBoost via a small Python service), alerts | ⬜ |
+| 3 | **Logs & Infra**: Nginx/AWS/Docker log connectors, log anomaly detection | ✅ Done |
+| 4 | **Intelligence**: anomaly detection engine (all metrics), forecasting (Prophet/XGBoost via a small Python service), alert channels + scheduling | ⬜ Next |
 | 5 | **Context**: crawl the company's site/socials, pgvector embeddings, RAG so answers know *your business* | ⬜ |
 | 6 | **BI + session replay**: Power BI, Tableau, Looker, Clarity, Hotjar | ⬜ |
 | 7 | **Workspace**: Gmail/M365/SendGrid deliverability, DMARC | ⬜ |
@@ -302,8 +343,9 @@ connection → sync (724 metrics) → query → compare → see it on a chart.
 1. **Make one connector real** (Stripe is easiest — one API key). Proves the whole
    mock→live architecture actually works against a real API.
 2. **Real auth** (Clerk) so it's genuinely multi-user.
-3. **Scheduled syncs** (BullMQ) so data updates without a button click.
-4. Then Phase 3+.
+3. **Scheduled syncs** (BullMQ) so data updates without a button click — this
+   also gives anomaly detection its cron cadence.
+4. Then Phase 4+.
 
 ---
 

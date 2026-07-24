@@ -7,10 +7,13 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma } from '../../generated/prisma/client';
 import { ConnectorRegistry } from '../connectors/registry';
+import { LogConnector } from '../connectors/logs/log-connector';
 import {
   METRICS_STORE,
   type MetricsStore,
 } from '../metrics/metrics-store.interface';
+import { LogsService } from '../logs/logs.service';
+import { AnomaliesService } from '../anomalies/anomalies.service';
 import type { CreateConnectionDto } from './dto/create-connection.dto';
 
 /**
@@ -26,6 +29,8 @@ export class ConnectionsService {
     private readonly prisma: PrismaService,
     private readonly registry: ConnectorRegistry,
     @Inject(METRICS_STORE) private readonly metrics: MetricsStore,
+    private readonly logs: LogsService,
+    private readonly anomalies: AnomaliesService,
   ) {}
 
   /** List every connection for the tenant. */
@@ -91,6 +96,27 @@ export class ConnectionsService {
       // double-count. Same reason a retried job is safe.
       await this.metrics.deleteRange(tenantId, conn.source, start, end);
       const written = await this.metrics.insertMany(tenantId, metrics);
+
+      // Log sources also persist the raw events behind those metrics, then get
+      // an immediate anomaly pass so an error spike alerts on the same sync
+      // that ingested it. The end bound stretches to cover the final day's
+      // intraday timestamps (metrics snap to midnight; events don't).
+      let logsWritten: number | undefined;
+      let anomaliesFound: number | undefined;
+      if (connector instanceof LogConnector) {
+        const events = await connector.collectLogs(tenantId, start, end);
+        const endOfLastDay = new Date(end.getTime() + 86_400_000);
+        logsWritten = await this.logs.replaceRange(
+          tenantId,
+          conn.source,
+          start,
+          endOfLastDay,
+          events,
+        );
+        const detection = await this.anomalies.detect(tenantId, conn.source);
+        anomaliesFound = detection.found;
+      }
+
       const updated = await this.prisma.connection.update({
         where: { id },
         data: { status: 'active', lastSyncAt: new Date() },
@@ -101,6 +127,7 @@ export class ConnectionsService {
         status: updated.status,
         lastSyncAt: updated.lastSyncAt,
         metricsWritten: written,
+        ...(logsWritten !== undefined ? { logsWritten, anomaliesFound } : {}),
       };
     } catch (error) {
       await this.prisma.connection.update({

@@ -12,6 +12,11 @@ import { StripeConnector } from './commerce/stripe.connector';
 import { ShopifyConnector } from './commerce/shopify.connector';
 import { HubSpotConnector } from './crm/hubspot.connector';
 import { MailchimpConnector } from './marketing/mailchimp.connector';
+import { AwsLogsConnector } from './logs/aws.connector';
+import { VultrLogsConnector } from './logs/vultr.connector';
+import { HostingerLogsConnector } from './logs/hostinger.connector';
+import { NginxLogsConnector } from './logs/nginx.connector';
+import { DockerLogsConnector } from './logs/docker.connector';
 
 // Every connector class. Add a new source by importing it and listing it here.
 const CONNECTOR_CLASSES = [
@@ -25,6 +30,11 @@ const CONNECTOR_CLASSES = [
   ShopifyConnector,
   HubSpotConnector,
   MailchimpConnector,
+  AwsLogsConnector,
+  VultrLogsConnector,
+  HostingerLogsConnector,
+  NginxLogsConnector,
+  DockerLogsConnector,
 ];
 
 @Module({

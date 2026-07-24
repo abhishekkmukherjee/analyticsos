@@ -9,6 +9,8 @@ import { ConnectorsModule } from './modules/connectors/connectors.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { ConnectionsModule } from './modules/connections/connections.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { LogsModule } from './modules/logs/logs.module';
+import { AnomaliesModule } from './modules/anomalies/anomalies.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ChatModule } from './modules/chat/chat.module';
     MetricsModule,
     ConnectionsModule,
     ChatModule,
+    LogsModule,
+    AnomaliesModule,
   ],
   controllers: [AppController],
   providers: [
